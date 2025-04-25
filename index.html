@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Tradex - Admin Panel</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body class="bg-gray-100 text-gray-900">
+  <header class="bg-blue-600 p-4 text-white text-center text-2xl font-bold">
+    Tradex - Admin Panel
+  </header>
+
+  <main class="p-6 max-w-sm mx-auto bg-white rounded-xl shadow-md mt-8">
+    <h2 class="text-xl font-semibold mb-4">Create Portfolio for User</h2>
+    <form id="adminForm" class="space-y-3">
+      <input type="email" placeholder="User Email" id="userEmail" class="w-full p-2 border rounded" required />
+      <input type="text" placeholder="Portfolio Name" id="portfolioName" class="w-full p-2 border rounded" required />
+      <input type="file" id="portfolioImage" class="w-full p-2 border rounded" required />
+      
+      <!-- Added fields for invested amount and amount earned -->
+      <input type="number" placeholder="Invested Amount" id="investedAmount" class="w-full p-2 border rounded" required />
+      <input type="number" placeholder="Amount Earned" id="amountEarned" class="w-full p-2 border rounded" required />
+      
+      <button type="submit" class="bg-blue-600 text-white py-2 px-4 rounded hover:bg-blue-700 w-full">Create Portfolio</button>
+    </form>
+  </main>
+  <div class="max-w-4xl mx-auto bg-white p-6 rounded-xl shadow-md">
+    <h1 class="text-2xl font-bold mb-4">Admin Panel</h1>
+
+    <div>
+      <label for="userSelect" class="block mb-2 font-medium">Select User</label>
+      <select id="userSelect" class="w-full border p-2 rounded mb-4"></select>
+    </div>
+
+    <div id="userInfo" class="mb-4 hidden">
+      <h2 class="text-xl font-semibold mb-2">User Portfolio</h2>
+      <div id="portfolioInfo" class="mb-4"></div>
+      <h3 class="text-lg font-semibold mb-2">Chat with User</h3>
+      <div id="adminChatBox" class="bg-gray-100 h-40 overflow-y-auto p-3 border rounded text-sm mb-3"></div>
+      <form id="adminChatForm" class="flex gap-2">
+        <input type="text" id="adminChatInput" placeholder="Type your reply..." class="flex-1 border p-2 rounded" />
+        <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded">Send</button>
+      </form>
+    </div>
+  </div>
+
+  <script>
+    const adminForm = document.getElementById('adminForm');
+
+    adminForm.addEventListener('submit', function (e) {
+      e.preventDefault();
+
+      const userEmail = document.getElementById('userEmail').value;
+      const portfolioName = document.getElementById('portfolioName').value;
+      const portfolioImage = document.getElementById('portfolioImage').files[0];
+      const investedAmount = parseFloat(document.getElementById('investedAmount').value);
+      const amountEarned = parseFloat(document.getElementById('amountEarned').value);
+
+      if (userEmail && portfolioName && portfolioImage && !isNaN(investedAmount) && !isNaN(amountEarned)) {
+        const reader = new FileReader();
+        reader.onloadend = function () {
+          const portfolioData = {
+            name: portfolioName,
+            image: reader.result,  // The base64 encoded image
+            investedAmount: investedAmount,
+            amountEarned: amountEarned,
+          };
+
+          // Save the portfolio data in localStorage under the user's email
+          localStorage.setItem(userEmail, JSON.stringify(portfolioData));
+
+          alert('Portfolio created for ' + userEmail);
+        };
+        reader.readAsDataURL(portfolioImage); // Read image as base64
+      } else {
+        alert('Please fill in all fields correctly.');
+      }
+    });
+    const userSelect = document.getElementById('userSelect');
+    const userInfo = document.getElementById('userInfo');
+    const portfolioInfo = document.getElementById('portfolioInfo');
+    const adminChatBox = document.getElementById('adminChatBox');
+    const adminChatInput = document.getElementById('adminChatInput');
+    const adminChatForm = document.getElementById('adminChatForm');
+
+    let selectedEmail = null;
+
+    // Load all user emails from localStorage
+    function loadUserList() {
+      userSelect.innerHTML = '<option disabled selected>Select a user</option>';
+      for (let key in localStorage) {
+        if (localStorage.hasOwnProperty(key)) {
+          try {
+            const user = JSON.parse(localStorage.getItem(key));
+            if (user && user.name && user.investedAmount) {
+                const opt = document.createElement('option');
+               opt.value = key;
+               opt.textContent = `
+              ${user.name} (${key}) ${user.adminUnread ? '🔴 NEW' : ''}`;
+
+              userSelect.appendChild(opt);
+            }
+          } catch (e) {}
+        }
+      }
+    }
+
+    // Show selected user info
+    function loadUser(email) {
+      const user = JSON.parse(localStorage.getItem(email));
+      if (!user) return;
+
+      selectedEmail = email;
+      userInfo.classList.remove('hidden');
+
+      portfolioInfo.innerHTML = `
+        <p><strong>Name:</strong> ${user.name}</p>
+        <p><strong>Invested:</strong> $${user.investedAmount}</p>
+        <p><strong>Earned:</strong> $${user.amountEarned}</p>
+        <p><strong>Withdrawals:</strong> ${user.withdrawals?.length || 0}</p>
+      `;
+
+      loadChat(user);
+    }
+
+    // Load chat messages
+    function loadChat(userOrEmail) {
+  const user = typeof userOrEmail === 'string'
+    ? JSON.parse(localStorage.getItem(userOrEmail))
+    : userOrEmail;
+
+  adminChatBox.innerHTML = ''; // or userChatBox if you're on the user side
+
+  (user.chatMessages || []).forEach(msg => {
+    const bubble = document.createElement('div');
+    const isAdmin = msg.from === 'admin';
+
+    bubble.className = `
+      flex ${isAdmin ? 'justify-start' : 'justify-end'} mb-2
+    `;
+
+    bubble.innerHTML = `
+      <div class="max-w-xs px-4 py-2 rounded-lg shadow 
+        ${isAdmin ? 'bg-green-200 text-left' : 'bg-blue-500 text-white text-right'}">
+        <p class="text-sm">${msg.text}</p>
+        <span class="block text-[10px] mt-1 text-gray-500">${formatTime(msg.time)}</span>
+      </div>
+    `;
+
+    adminChatBox.appendChild(bubble); // or userChatBox
+  });
+
+  adminChatBox.scrollTop = adminChatBox.scrollHeight;
+}
+
+// Time formatting helper
+function formatTime(isoTime) {
+  const d = new Date(isoTime);
+  return `${d.getHours()}:${String(d.getMinutes()).padStart(2, '0')}`;
+}
+
+
+    // Submit admin reply
+    adminChatForm.addEventListener('submit', e => {
+      e.preventDefault();
+      const msg = adminChatInput.value.trim();
+      if (!msg || !selectedEmail) return;
+
+      const user = JSON.parse(localStorage.getItem(selectedEmail));
+      user.chatMessages = user.chatMessages || [];
+      user.chatMessages.push({ text: msg, from: 'admin', time: new Date().toISOString() });
+
+      localStorage.setItem(selectedEmail, JSON.stringify(user));
+      adminChatInput.value = '';
+      loadChat(user);
+    });
+
+    userSelect.addEventListener('change', e => {
+      loadUser(e.target.value);
+    });
+
+    loadUserList(); // On page load
+    // Auto-refresh chat every 3 seconds if a user is selected
+setInterval(() => {
+  if (!selectedEmail) return;
+
+  const currentUser = JSON.parse(localStorage.getItem(selectedEmail));
+  if (currentUser) {
+    loadChat(currentUser);
+  }
+}, 3000); // Every 3 seconds
+
+  </script>
+</body>
+</html>
